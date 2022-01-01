@@ -6,9 +6,11 @@ const formatError = (text) => {
   const textArray = string.split(',')
   textArray.shift()
   return textArray.toString()
-
 }
-
+const checkTest = (text) => {
+  const string = text.toString('utf8')
+  return string.indexOf('OK') >= 0;
+}
 class codeController{
   async execute(req, res){
     try{
@@ -17,13 +19,22 @@ class codeController{
         case 'python':
           fs.writeFileSync("code.py", code)
           const pp = spawn('python', ['code.py']);
-          await pp.stdout.on('data', (data) => {
-            return res.json({passed: true})
-          });
-          await pp.stderr.on('data', (data) => {
+          pp.stderr.on('data', (data) => {
             return res.json({message: formatError(data)})
           });
-          fs.unlinkSync('code.py')
+          await pp.on('close', (code) => {
+            console.log(`child process exited with code ${code}`);
+          })
+          const test = spawn('python', ['code_test.py'])
+          await test.stderr.on('data', (data) => {
+            if(checkTest(data)){
+              return res.json({passed: true})
+            }
+            return res.json({message: 'tests failed'})
+          });
+          await test.on('close', (code) => {
+            console.log(`child process exited with code ${code}`);
+          })
       }
     } catch (e){
       console.log(e)
